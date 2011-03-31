@@ -80,15 +80,15 @@ public class RiakClient implements RiakMessageCodes {
 	private ThreadLocal<RiakConnection> connections = new ThreadLocal<RiakConnection>();
 
 	RiakConnection getConnection() throws IOException {
-		return getConnection(true);
+		return getConnection(false);
 	}
 
-	RiakConnection getConnection(boolean setClientId) throws IOException {
+	RiakConnection getConnection(boolean settingClientId) throws IOException {
         RiakConnection c = connections.get();
         if (c == null || !c.endIdleAndCheckValid()) {
             c = new RiakConnection(addr, port);
 
-            if (this.clientID != null && setClientId) {
+            if (this.clientID != null && !settingClientId) {
                 setClientID(clientID);
             }
         }
@@ -155,7 +155,7 @@ public class RiakClient implements RiakMessageCodes {
 	public void setClientID(ByteString id) throws IOException {
 		RpbSetClientIdReq req = RPB.RpbSetClientIdReq.newBuilder().setClientId(
 				id).build();
-		RiakConnection c = getConnection(false);
+		RiakConnection c = getConnection(true);
 		try {
 			c.send(MSG_SetClientIdReq, req);
 			c.receive_code(MSG_SetClientIdResp);
