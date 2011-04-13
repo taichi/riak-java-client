@@ -7,28 +7,42 @@ import java.net.InetSocketAddress;
 public class SimpleRiakResource implements RiakResource {
 
     private InetSocketAddress addr;
-    private RiakConnection connection;
+
+    private ThreadLocal<RiakConnection> slot = new ThreadLocal<RiakConnection>();
 
     public SimpleRiakResource(InetAddress addr, int port) {
         this.addr = new InetSocketAddress(addr, port);
     }
 
-    public void initialize() {
+    public void initialize() {}
+
+    public RiakConnection allocate() {
         try {
-            this.connection = new RiakConnection(this.addr);
-            this.connection.open();
+            RiakConnection connection = this.slot.get();
+            if ((connection == null) || connection.isClosed()) {
+                connection = new RiakConnection(this.addr);
+                connection.open();
+            }
+            this.slot.set(null);
+            return connection;
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    public RiakConnection allocate() {
-        return this.connection;
+    public void release(RiakConnection connection) {
+        RiakConnection rc = this.slot.get();
+        if (rc == null) {
+            this.slot.set(connection);
+        } else {
+            rc.close();
+        }
     }
 
-    public void release(RiakConnection connection) {}
-
     public void dispose() {
-        this.connection.close();
+        RiakConnection connection = this.slot.get();
+        if (connection != null) {
+            connection.close();
+        }
     }
 }
