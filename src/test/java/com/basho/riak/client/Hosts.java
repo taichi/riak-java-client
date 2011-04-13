@@ -17,6 +17,7 @@ package com.basho.riak.client;
  * unite host names for testing. <br/>
  * your environment is not {@code 127.0.0.1}, you also modify app.config.<br/>
  * there is a example. in this case, your riak server is {@code 192.168.0.2}.
+ * 
  * <pre>
  * from {http, [ {"127.0.0.1", 8098 } ]},
  * to   {http, [ {"127.0.0.1", 8098 }, {"192.168.0.2",8098} ]},
@@ -29,7 +30,7 @@ package com.basho.riak.client;
  */
 public class Hosts {
 
-	public static final String RIAK_HOST = "127.0.0.1";
+    public static final String RIAK_HOST = "10.0.1.104";
 
-	public static final String RIAK_URL = "http://" + RIAK_HOST + ":8098/riak";
+    public static final String RIAK_URL = "http://" + RIAK_HOST + ":8098/riak";
 }

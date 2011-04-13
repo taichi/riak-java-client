@@ -1,19 +1,19 @@
 /**
- * This file is part of riak-java-pb-client 
- *
+ * This file is part of riak-java-pb-client
+ * 
  * Copyright (c) 2010 by Trifork
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *  
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
  **/
 
 package com.basho.riak.pbc;
@@ -24,148 +24,113 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import com.basho.riak.pbc.RPB.RpbErrorResp;
 import com.google.protobuf.MessageLite;
 
 class RiakConnection {
 
-	static final int DEFAULT_RIAK_PB_PORT = 8087;
+    static final int DEFAULT_RIAK_PB_PORT = 8087;
+    static final int SOCKET_BUFFER_SIZE = 1024 * 200;
+    static final int CONNECTION_TIMEOUT = 1000;
 
-	 private Socket sock;
-	 private DataOutputStream dout;
-	 private DataInputStream din;
+    private InetSocketAddress addr;
+    private Socket sock;
+    private DataOutputStream dout;
+    private DataInputStream din;
 
-	public RiakConnection(String host) throws IOException {
-		this(host, DEFAULT_RIAK_PB_PORT);
-	}
+    public RiakConnection(InetAddress addr, int port) throws IOException {
+        this(new InetSocketAddress(addr, port));
+    }
 
-	public RiakConnection(String host, int port) throws IOException {
-		this(InetAddress.getByName(host), port);
-	}
+    public RiakConnection(InetSocketAddress addr) {
+        this.sock = new Socket();
+        this.addr = addr;
+    }
 
-	public RiakConnection(InetAddress addr, int port) throws IOException {
-		sock = new Socket(addr, port);
-		
-		sock.setSendBufferSize(1024 * 200);
-		
-		dout = new DataOutputStream(new BufferedOutputStream(sock
-				.getOutputStream(), 1024 * 200));
-		din = new DataInputStream(
-				new BufferedInputStream(sock.getInputStream(), 1024 * 200));
-	}
+    void open() throws IOException {
+        this.sock.setSendBufferSize(SOCKET_BUFFER_SIZE);
+        this.sock.setSoTimeout(CONNECTION_TIMEOUT);
 
-	///////////////////////
+        this.sock.connect(this.addr);
 
-	void send(int code, MessageLite req) throws IOException {
-		int len = req.getSerializedSize();
-		dout.writeInt(len + 1);
-		dout.write(code);
-		req.writeTo(dout);
-		dout.flush();
-	}
+        this.dout = new DataOutputStream(new BufferedOutputStream(this.sock.getOutputStream(), SOCKET_BUFFER_SIZE));
+        this.din = new DataInputStream(new BufferedInputStream(this.sock.getInputStream(), SOCKET_BUFFER_SIZE));
+    }
 
-	void send(int code) throws IOException {
-		dout.writeInt(1);
-		dout.write(code);
-		dout.flush();
-	}
+    // /////////////////////
 
-	byte[] receive(int code) throws IOException {
-		int len = din.readInt();
-		int get_code = din.read();
+    void send(int code, MessageLite req) throws IOException {
+        int len = req.getSerializedSize();
+        this.dout.writeInt(len + 1);
+        this.dout.write(code);
+        req.writeTo(this.dout);
+        this.dout.flush();
+    }
 
-		if (code == RiakClient.MSG_ErrorResp) {
-			RpbErrorResp err = com.basho.riak.pbc.RPB.RpbErrorResp.parseFrom(din);
-			throw new RiakError(err);
-		}
+    void send(int code) throws IOException {
+        this.dout.writeInt(1);
+        this.dout.write(code);
+        this.dout.flush();
+    }
 
-		byte[] data = null;
-		if (len > 1) {
-			data = new byte[len - 1];
-			din.readFully(data);
-		}
+    byte[] receive(int code) throws IOException {
+        int len = this.din.readInt();
+        int get_code = this.din.read();
 
-		if (code != get_code) {
-			throw new IOException("bad message code");
-		}
+        if (code == RiakClient.MSG_ErrorResp) {
+            RpbErrorResp err = com.basho.riak.pbc.RPB.RpbErrorResp.parseFrom(this.din);
+            throw new RiakError(err);
+        }
 
-		return data;
-	}
+        byte[] data = null;
+        if (len > 1) {
+            data = new byte[len - 1];
+            this.din.readFully(data);
+        }
 
-	void receive_code(int code) throws IOException, RiakError {
-		int len = din.readInt();
-		int get_code = din.read();
-		if (code == RiakClient.MSG_ErrorResp) {
-			RpbErrorResp err = com.basho.riak.pbc.RPB.RpbErrorResp.parseFrom(din);
-			throw new RiakError(err);
-		}
-		if (len != 1 || code != get_code) {
-			throw new IOException("bad message code");
-		}
-	}
+        if (code != get_code) {
+            throw new IOException("bad message code");
+        }
 
-	static Timer timer = new Timer();
-	TimerTask idle_timeout;
-	
-	public void beginIdle() {
-		idle_timeout = new TimerTask() {
-			
-			@Override
-			public void run() {
-				RiakConnection.this.timer_fired(this);
-			}
-		};
-		
-		timer.schedule(idle_timeout, 1000);
-	}
+        return data;
+    }
 
-	synchronized void timer_fired(TimerTask fired_timer) {
-		if (idle_timeout != fired_timer) {
-			// if it is not our current timer, then ignore
-			return;
-		}
-		
-		close();
-	}
+    void receive_code(int code) throws IOException, RiakError {
+        int len = this.din.readInt();
+        int get_code = this.din.read();
+        if (code == RiakClient.MSG_ErrorResp) {
+            RpbErrorResp err = com.basho.riak.pbc.RPB.RpbErrorResp.parseFrom(this.din);
+            throw new RiakError(err);
+        }
+        if ((len != 1) || (code != get_code)) {
+            throw new IOException("bad message code");
+        }
+    }
 
-	void close() {
-		if (isClosed())
-			return;
-		
-		try {
-			sock.close();
-			din = null;
-			dout = null;
-			sock = null;
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
+    void close() {
+        if (isClosed()) {
+            return;
+        }
 
-	synchronized boolean endIdleAndCheckValid() {
-		TimerTask tt = idle_timeout;
-		if (tt != null) { tt.cancel(); }
-		idle_timeout = null;
-		
-		if (isClosed()) {
-			return false;
-		} else {
-			return true;
-		}
-	}
+        try {
+            this.sock.close();
+            this.din = null;
+            this.dout = null;
+            this.sock = null;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-	public DataOutputStream getOutputStream() {
-		return dout;
-	}
+    public DataOutputStream getOutputStream() {
+        return this.dout;
+    }
 
-	public boolean isClosed() {
-		return sock == null || sock.isClosed();
-	}
-	
-	
+    public boolean isClosed() {
+        return (this.sock == null) || this.sock.isClosed();
+    }
+
 }
