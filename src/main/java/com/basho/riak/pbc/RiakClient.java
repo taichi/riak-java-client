@@ -64,16 +64,17 @@ public class RiakClient implements RiakMessageCodes {
      */
     private volatile ByteString clientID;
 
-    public RiakClient(String host) throws IOException {
+    @Deprecated public RiakClient(String host) throws IOException {
         this(host, RiakConnection.DEFAULT_RIAK_PB_PORT);
     }
 
-    public RiakClient(String host, int port) throws IOException {
+    @Deprecated public RiakClient(String host, int port) throws IOException {
         this(InetAddress.getByName(host), port);
     }
 
-    public RiakClient(InetAddress addr, int port) throws IOException {
+    @Deprecated public RiakClient(InetAddress addr, int port) throws IOException {
         this.resource = new SimpleRiakResource(addr, port);
+        this.resource.initialize();
     }
 
     public RiakClient(RiakResource resource) {
@@ -86,7 +87,7 @@ public class RiakClient implements RiakMessageCodes {
 
     RiakConnection getConnection(boolean setClientId) throws IOException {
         RiakConnection c = this.resource.allocate();
-        if ((this.clientID != null) && setClientId) {
+        if ((this.clientID != null) && setClientId && (c.isClientIdSet() == false)) {
             setClientID(this.clientID);
         }
         return c;
@@ -94,6 +95,10 @@ public class RiakClient implements RiakMessageCodes {
 
     void release(RiakConnection c) {
         this.resource.release(c);
+    }
+
+    public void dispose() {
+        this.resource.dispose();
     }
 
     /**

@@ -41,6 +41,8 @@ class RiakConnection {
     private DataOutputStream dout;
     private DataInputStream din;
 
+    private boolean clientIdSet = false;
+
     public RiakConnection(InetAddress addr, int port) throws IOException {
         this(new InetSocketAddress(addr, port));
     }
@@ -52,12 +54,16 @@ class RiakConnection {
 
     void open() throws IOException {
         this.sock.setSendBufferSize(SOCKET_BUFFER_SIZE);
-        this.sock.setSoTimeout(CONNECTION_TIMEOUT);
+        // this.sock.setSoTimeout(CONNECTION_TIMEOUT);
 
         this.sock.connect(this.addr);
 
         this.dout = new DataOutputStream(new BufferedOutputStream(this.sock.getOutputStream(), SOCKET_BUFFER_SIZE));
         this.din = new DataInputStream(new BufferedInputStream(this.sock.getInputStream(), SOCKET_BUFFER_SIZE));
+    }
+
+    boolean isClientIdSet() {
+        return this.clientIdSet;
     }
 
     // /////////////////////
@@ -107,6 +113,9 @@ class RiakConnection {
         }
         if ((len != 1) || (code != get_code)) {
             throw new IOException("bad message code");
+        }
+        if (code == RiakClient.MSG_SetClientIdResp) {
+            this.clientIdSet = true;
         }
     }
 

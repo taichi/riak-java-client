@@ -7,30 +7,28 @@ import java.net.InetSocketAddress;
 public class SimpleRiakResource implements RiakResource {
 
     private InetSocketAddress addr;
-
-    public SimpleRiakResource(String hostname) {
-        this(hostname, RiakConnection.DEFAULT_RIAK_PB_PORT);
-    }
-
-    public SimpleRiakResource(String hostname, int port) {
-        this.addr = new InetSocketAddress(hostname, port);
-    }
+    private RiakConnection connection;
 
     public SimpleRiakResource(InetAddress addr, int port) {
         this.addr = new InetSocketAddress(addr, port);
     }
 
-    public RiakConnection allocate() {
+    public void initialize() {
         try {
-            RiakConnection connection = new RiakConnection(this.addr);
-            connection.open();
-            return connection;
+            this.connection = new RiakConnection(this.addr);
+            this.connection.open();
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    public void release(RiakConnection connection) {
-        connection.close();
+    public RiakConnection allocate() {
+        return this.connection;
+    }
+
+    public void release(RiakConnection connection) {}
+
+    public void dispose() {
+        this.connection.close();
     }
 }

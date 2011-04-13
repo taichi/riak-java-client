@@ -2,9 +2,9 @@
  * This file is provided to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -35,6 +35,7 @@ import com.google.protobuf.ByteString;
 
 /**
  * Assumes Riak is reachable at {@link com.basho.riak.client.Hosts#RIAK_HOST }.
+ * 
  * @author russell
  * @see com.basho.riak.client.Hosts#RIAK_HOST
  */
@@ -66,7 +67,7 @@ public class ITestBasic {
 
         assertEquals(bucketInfo, c.getBucketProperties(copyFromUtf8(BUCKET)));
 
-        //change them
+        // change them
         bucketInfo.allowMult(false);
         bucketInfo.nValue(3);
 
@@ -96,7 +97,6 @@ public class ITestBasic {
     @Test public void clientId() throws Exception {
         final String clientId = "HUPA_PUPA";
         final RiakClient c = new RiakClient(RIAK_HOST);
-
         c.setClientID(clientId);
         assertEquals(clientId.substring(0, Constants.RIAK_CLIENT_ID_LENGTH), c.getClientID());
     }
@@ -119,8 +119,8 @@ public class ITestBasic {
         try {
             c.setClientID(clientId);
             fail("Expected IllegalArgumentException");
-        }catch(IllegalArgumentException e) {
-            //NO-OP
+        } catch (IllegalArgumentException e) {
+            // NO-OP
         }
     }
 
@@ -153,15 +153,15 @@ public class ITestBasic {
         final String key = UUID.randomUUID().toString();
         final String content = "content";
         final RiakClient c = new RiakClient(RIAK_HOST);
-        
+
         c.store(new RiakObject(bucket, key, content));
 
         final ByteString[] buckets = c.listBuckets();
 
         boolean testBucketPresent = false;
 
-        for(ByteString b : buckets) {
-            if(b.toStringUtf8().equals(bucket)) {
+        for (ByteString b : buckets) {
+            if (b.toStringUtf8().equals(bucket)) {
                 testBucketPresent = true;
                 break;
             }
@@ -183,10 +183,10 @@ public class ITestBasic {
         final String nonExistantKey = "non_existant_key";
         final RiakClient c = new RiakClient(RIAK_HOST);
         c.prepareClientID();
-        RiakObject o  = new RiakObject(BUCKET, key, content);
+        RiakObject o = new RiakObject(BUCKET, key, content);
 
-        //empty bucket
-        for(ByteString k : c.listKeys(copyFromUtf8(BUCKET))) {
+        // empty bucket
+        for (ByteString k : c.listKeys(copyFromUtf8(BUCKET))) {
             c.delete(BUCKET, k.toStringUtf8());
         }
 
@@ -205,7 +205,7 @@ public class ITestBasic {
         assertEquals(1, fetched.length);
         assertEquals(updatedContent, fetched[0].getValue().toStringUtf8());
 
-        //fetch absent object
+        // fetch absent object
         c.delete(BUCKET, nonExistantKey, 2);
         fetched = c.fetch(BUCKET, nonExistantKey);
 
